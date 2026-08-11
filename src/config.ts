@@ -27,6 +27,18 @@ const configSchema = z.object({
   HTTP_HOST: z.string().default("localhost"),
   HTTP_AUTH_TOKEN: z.string().optional(),
   HTTP_AUTH_HEADER_NAME: z.string().default("x-mcp-token"),
+  HTTP_TRUST_PROXY: z
+    .string()
+    .transform((val) => val === "true")
+    .default("false"),
+  HTTP_RATE_LIMIT_WINDOW_MS: z
+    .string()
+    .transform((val) => parseInt(val, 10))
+    .default("900000"),
+  HTTP_RATE_LIMIT_MAX_REQUESTS: z
+    .string()
+    .transform((val) => parseInt(val, 10))
+    .default("100"),
   PICNIC_SESSION_FILE: z.string().default(defaultSessionFile),
 })
 

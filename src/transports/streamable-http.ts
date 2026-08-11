@@ -16,6 +16,7 @@ export interface StreamableHttpServerOptions {
   authToken?: string
   authHeaderName?: string
   corsOptions?: cors.CorsOptions
+  trustProxy?: boolean
   rateLimitConfig?: RateLimitConfig
   requestTimeoutMs?: number
   maxRequestSizeBytes?: number
@@ -50,6 +51,7 @@ export class StreamableHttpServer extends BaseTransportServer {
       host: "localhost",
       authHeaderName: "x-mcp-token",
       corsOptions: { origin: "*" },
+      trustProxy: false,
       rateLimitConfig: { windowMs: 15 * 60 * 1000, maxRequests: 100 },
       requestTimeoutMs: 10000,
       maxRequestSizeBytes: 1024 * 1024 * 10, // 10MB
@@ -74,6 +76,13 @@ export class StreamableHttpServer extends BaseTransportServer {
    * Set up middleware for the Express app
    */
   private setupMiddleware(): void {
+    // Behind a reverse proxy every request arrives from the proxy's address, so
+    // rate limiting would put all clients in a single bucket. Trusting
+    // X-Forwarded-For restores per-client identification.
+    if (this.options.trustProxy) {
+      this.app.set("trust proxy", true)
+    }
+
     // Request logging middleware
     if (this.options.enableRequestLogging) {
       this.app.use((req: Request, res: Response, next: NextFunction) => {
@@ -93,7 +102,14 @@ export class StreamableHttpServer extends BaseTransportServer {
     // Rate limiting middleware
     if (this.options.rateLimitConfig) {
       this.rateLimiter = createRateLimitMiddleware(this.options.rateLimitConfig)
-      this.app.use(this.rateLimiter.middleware)
+      this.app.use((req: Request, res: Response, next: NextFunction) => {
+        // Health checks are unauthenticated and must not consume the quota
+        // that real clients need.
+        if (req.path === "/health") {
+          return next()
+        }
+        return this.rateLimiter!.middleware(req, res, next)
+      })
     }
 
     if (this.options.authToken) {
