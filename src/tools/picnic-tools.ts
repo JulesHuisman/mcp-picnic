@@ -837,10 +837,9 @@ toolRegistry.register({
   handler: async (args) => {
     await ensureClientInitialized()
     const client = getPicnicClient()
-    const cart = await client.cart.addProductToCart(args.productId, args.count)
+    await client.cart.addProductToCart(args.productId, args.count)
     return {
       message: `Added ${args.count} item(s) to cart`,
-      cart: filterCartData(cart),
     }
   },
 })
